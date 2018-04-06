@@ -6,90 +6,158 @@
 
 namespace fun
 {
-    template<typename It, typename Fun>
+    template<typename ContainerIn, typename ContainerOut>
     class Map;
 
-    template <typename It>
-    class Iterator
+    template<typename Container>
+    class Filter;
+
+    template<typename Container>
+    class Take;
+
+    template <typename Container>
+    class IIterator
     {
-      protected:
-        It& _begin;
-        It& _end;
+        public:
+            virtual std::optional<typename Container::value_type> next() = 0;
+
+            template<typename OutCont>
+            Map<OutCont, Container> map(std::function<typename OutCont::value_type(typename Container::value_type)> fun)
+            {
+                return Map<OutCont, Container>(*this, fun);
+            }
+
+            Filter<Container> filter(std::function<bool(typename Container::value_type)> pred)
+            {
+                return Filter<Container>(*this, pred);
+            }
+
+            Take<Container> take(int count)
+            {
+                return Take<Container>(*this, count);
+            }
+    };
+
+    template <typename Container>
+    class Iterator : public IIterator<Container>
+    {
+        protected:
+            typename Container::iterator _begin;
+            typename Container::iterator _end;
+
+        public:
+            Iterator(Iterator& other) = default;
+
+            Iterator(Container& cont)
+                : _begin(std::begin(cont))
+                , _end(std::end(cont))
+            {
+            }
+
+            std::optional<typename Container::value_type> next() override
+            {
+                if (_begin == _end)
+                {
+                    return {};
+                }
+                else
+                {
+                    auto& res = *_begin;
+                    _begin++;
+                    return res;
+                }
+            }
+
+    };
+
+    template <typename Container>
+    class Filter : public IIterator<Container>
+    {
+        IIterator<Container>& _iter;
+        std::function<bool(typename Container::value_type)> _predicate;
+
+        public:
+            Filter(IIterator<Container>& iter, std::function<bool(typename Container::value_type)> pred)
+                : _iter(iter)
+                , _predicate(pred)
+            {
+            }
+
+            std::optional<typename Container::value_type> next() override
+            {
+                while(auto item = _iter.next())
+                {
+                    if (_predicate(*item))
+                        return item;
+                }
+
+                return {};
+            }
+    };
+    
+    template <typename Container, typename OutContainer>
+    class Map : public IIterator<OutContainer>
+    {
+        IIterator<Container>& _iter;
+        std::function<typename OutContainer::value_type(typename Container::value_type)> _fun;
+
       public:
-        Iterator(It& begin, It& end)
-            : _begin(begin)
-            , _end(end)
+        Map(IIterator<Container>& iter, std::function<typename OutContainer::value_type(typename Container::value_type)> fun)
+            : _iter(iter)
+            , _fun(fun)
         {
         }
 
-        Iterator(Iterator& other) = default;
-
-        virtual std::optional<typename It::value_type> next()
+        std::optional<typename OutContainer::value_type> next() override
         {
-           if (_begin == _end)
-           {
-               return {};
-           }
-           else
-           {
-               auto& res = *_begin;
-               _begin++;
-               return res;
-           }
-        }
+            if (auto item = _iter.next())
+            {
+                return _fun(*item);
+            }
 
-        template <typename Fun>
-        Map<It, Fun> map(Fun fun)
-        {
-            return Map<It, Fun>(*this, fun);
+            return {};
         }
     };
 
-    template <typename It, typename Fun>
-    class Map : public Iterator<It>
+    template <typename Container>
+    class Take : public IIterator<Container>
     {
-        using super = Iterator<It>;
-        Fun _f;
+        IIterator<Container>& _iter;
+        int _count;
 
       public:
-          Map(It& begin, It& end, Fun f)
-              : Iterator<It>(begin, end)
-              , _f(f)
-          {
-          }
+        Take(IIterator<Container>& iter, int count) 
+            : _iter(iter)
+            , _count(count)
+        {
+        }
 
-          Map(Iterator<It>& it, Fun f)
-              : Iterator<It>(it)
-              , _f(f)
-          {
-          }
+        std::optional<typename Container::value_type> next() override
+        {
+            if (_count > 0)
+            if (auto item = _iter.next())
+            {
+                _count--;
+                return item;
+            }
 
-          std::optional<typename Fun::result_type> next() override
-          {
-              if (auto n = super::next())
-              {
-                  return _f(*n);
-              }
-              else
-              {
-                  return {};
-              }
-          }
+            return {};
+        }
     };
 }
 
-
 int main(int argc, char** argv)
 {
-    std::vector<int> a{ 2, 1, 2, 3 };
-    auto b = a.begin();
-    auto e = a.end();
+    auto square = std::function([](int a) -> int { return a*a; });
+    auto gt0 = std::function([](const int& a) -> bool { return a > 0; });
 
-    fun::Iterator it(b, e);
+    std::vector<int> a{ 0, 1, 2, 3 };
 
-    auto map = it.map(std::function([](int a) -> int { return a*a; }));
+    fun::Iterator it(a);
 
-    while (auto x = map.next())
+    auto it2 = it.map<std::vector<int>>(square);
+
+    while (auto x = it2.next())
         std::cout << *x << " ";
 
     std::cout << std::endl;
