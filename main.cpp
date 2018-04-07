@@ -36,6 +36,18 @@ namespace fun
             {
                 return Take<Container>(*this, count);
             }
+
+            Container collect()
+            {
+                Container cont;
+                
+                while (auto item = next())
+                {
+                    cont.push_back(*item);
+                }
+
+                return cont;
+            }
     };
 
     template <typename Container>
@@ -146,19 +158,46 @@ namespace fun
     };
 }
 
+struct Test
+{
+    int member;
+
+    Test()
+    {
+    }
+
+    Test(const Test& other)
+    {
+        std::cerr << "copy ";
+    }
+
+    Test(Test&& other)
+    {
+        std::cerr << "mov ";
+    }
+
+    Test& operator=(const Test& oth)
+    {
+        std::cerr << "= ";
+    }
+};
+
+
 int main(int argc, char** argv)
 {
     auto square = std::function([](int a) -> int { return a*a; });
     auto gt0 = std::function([](const int& a) -> bool { return a > 0; });
 
-    std::vector<int> a{ 0, 1, 2, 3 };
+    //std::vector<int> a{ 0, 1, 2, 3 };
+    std::vector<Test> a { Test(), Test() };
 
     fun::Iterator it(a);
 
-    auto it2 = it.map<std::vector<int>>(square);
+    //auto it2 = it.map<std::vector<int>>(square).take(2).collect();
+    auto it2 = it.take(2).take(2).collect();
 
-    while (auto x = it2.next())
-        std::cout << *x << " ";
+    //for (auto& x : it2)
+    //  std::cout << x << " ";
 
     std::cout << std::endl;
 
