@@ -15,6 +15,9 @@ namespace fun
     template<typename Container>
     class Take;
 
+    template<typename Container>
+    class Cloned;
+
     template <typename Container>
     class IIterator
     {
@@ -37,13 +40,18 @@ namespace fun
                 return Take<Container>(*this, count);
             }
 
+            Cloned<Container> cloned() 
+            {
+                return Cloned<Container>(*this);
+            }
+
             Container collect()
             {
                 Container cont;
                 
                 while (auto item = next())
                 {
-                    cont.push_back(*item);
+                    cont.push_back(std::move(*item));
                 }
 
                 return cont;
@@ -51,18 +59,53 @@ namespace fun
     };
 
     template <typename Container>
-    class Iterator : public IIterator<Container>
+    class IntoIter : public IIterator<Container>
     {
         protected:
+            Container _container;
             typename Container::iterator _begin;
             typename Container::iterator _end;
 
         public:
-            Iterator(Iterator& other) = default;
+            IntoIter(IntoIter& other) = default;
 
-            Iterator(Container& cont)
-                : _begin(std::begin(cont))
-                , _end(std::end(cont))
+            IntoIter(Container&& cont)
+                : _container(std::move(cont))
+                , _begin(std::begin(_container))
+                , _end(std::end(_container))
+            {
+            }
+
+            std::optional<typename Container::value_type> next() override
+            {
+                if (_begin == _end)
+                {
+                    return {};
+                }
+                else
+                {
+                    auto& res = *_begin;
+                    _begin++;
+                    return std::move(res);
+                }
+            }
+    };
+
+    template <typename Container>
+    class Iter : public IIterator<Container>
+    {
+        protected:
+            Container& _container;
+            typename Container::iterator _begin;
+            typename Container::iterator _end;
+
+        public:
+            Iter(Iter& other) = default;
+
+            Iter(Container& cont)
+                : _container(cont)
+                , _begin(std::begin(_container))
+                , _end(std::end(_container))
             {
             }
 
@@ -79,7 +122,6 @@ namespace fun
                     return res;
                 }
             }
-
     };
 
     template <typename Container>
@@ -100,7 +142,7 @@ namespace fun
                 while(auto item = _iter.next())
                 {
                     if (_predicate(*item))
-                        return item;
+                        return std::move(*item);
                 }
 
                 return {};
@@ -150,7 +192,29 @@ namespace fun
             if (auto item = _iter.next())
             {
                 _count--;
-                return item;
+                return std::move(*item);
+            }
+
+            return {};
+        }
+    };
+
+    template <typename Container>
+    class Cloned : public IIterator<Container>
+    {
+        IIterator<Container>& _iter;
+
+      public:
+        Cloned(IIterator<Container>& iter)
+            : _iter(iter)
+        {
+        }
+
+        std::optional<typename Container::value_type> next() override
+        {
+            if (auto item = _iter.next())
+            {
+                return *item;
             }
 
             return {};
@@ -165,20 +229,31 @@ struct Test
     Test()
     {
     }
+    
+    Test(int n)
+    {
+        member = n;
+    }
 
     Test(const Test& other)
     {
-        std::cerr << "copy ";
+        member = other.member;
+        std::cerr << "copy" << member << " ";
     }
 
     Test(Test&& other)
-    {
-        std::cerr << "mov ";
+    { 
+        member = other.member;
+        other.member+=10;
+        std::cerr << "mov" << member << " ";
     }
 
     Test& operator=(const Test& oth)
     {
-        std::cerr << "= ";
+        member = oth.member;
+        std::cerr << "=" << member << " ";
+
+        return *this;
     }
 };
 
@@ -189,17 +264,22 @@ int main(int argc, char** argv)
     auto gt0 = std::function([](const int& a) -> bool { return a > 0; });
 
     //std::vector<int> a{ 0, 1, 2, 3 };
-    std::vector<Test> a { Test(), Test() };
+    std::vector<Test> a { Test(1), Test(2) };
 
-    fun::Iterator it(a);
+    fun::Iter it(a);
 
     //auto it2 = it.map<std::vector<int>>(square).take(2).collect();
-    auto it2 = it.take(2).take(2).collect();
+    auto vec2 = it.take(2).take(1).collect();
 
-    //for (auto& x : it2)
-    //  std::cout << x << " ";
+    for (auto& x : vec2)
+      std::cerr << x.member << " ";
 
-    std::cout << std::endl;
+    std::cerr << std::endl;
+
+    for (auto& x : a)
+        std::cerr << x.member << " ";
+
+    std::cerr << std::endl;
 
     return 0;
 }
