@@ -6,252 +6,75 @@
 
 namespace fun
 {
-namespace into
-{
-    template<typename ContainerIn, typename ContainerOut>
-    class Map;
-
-    template<typename Container>
-    class Filter;
-
-    template<typename Container>
+    template <typename Type, template <typename, typename...> class Container, typename... Args>
     class Take;
 
-    template<typename Container>
-    class Cloned;
-
-    template <typename Container>
-    class IIterator
-    {
-        public:
-            virtual std::optional<typename Container::value_type> next() = 0;
-
-            template<typename OutCont>
-            Map<OutCont, Container> map(std::function<typename OutCont::value_type(typename Container::value_type)> fun)
-            {
-                return Map<OutCont, Container>(*this, fun);
-            }
-
-            Filter<Container> filter(std::function<bool(typename Container::value_type)> pred)
-            {
-                return Filter<Container>(*this, pred);
-            }
-
-            Take<Container> take(int count)
-            {
-                return Take<Container>(*this, count);
-            }
-
-            virtual Container collect()
-            {
-                Container cont;
-                
-                while (auto item = next())
-                    cont.push_back(*item);
-
-                return cont;
-            }
-
-            size_t count()
-            {
-                size_t cnt = 0;
-
-                while (next())
-                    cnt++;
-
-                return cnt;
-            }
-    };
-
-    template <typename Container>
-    class IntoIter : public IIterator<Container>
-    {
-        protected:
-            Container _container;
-            typename Container::iterator _begin;
-            typename Container::iterator _end;
-
-        public:
-            IntoIter(IntoIter& other) = default;
-
-            IntoIter(Container&& cont)
-                : _container(std::move(cont))
-                , _begin(std::begin(_container))
-                , _end(std::end(_container))
-            {
-            }
-
-            std::optional<typename Container::value_type> next() override
-            {
-                if (_begin == _end)
-                {
-                    return {};
-                }
-                else
-                {
-                    auto& res = *_begin;
-                    _begin++;
-                    return std::move(res);
-                }
-            }
-
-            Container collect() override
-            {
-                Container cont;
-                
-                while (auto item = next())
-                    cont.push_back(std::move(*item));
-
-                return cont;
-            }
-    };
-
-    template <typename Container>
-    class Filter : public IIterator<Container>
-    {
-        IIterator<Container>& _iter;
-        std::function<bool(typename Container::value_type)> _predicate;
-
-        public:
-            Filter(IIterator<Container>& iter, std::function<bool(typename Container::value_type)> pred)
-                : _iter(iter)
-                , _predicate(pred)
-            {
-            }
-
-            std::optional<typename Container::value_type> next() override
-            {
-                while(auto item = _iter.next())
-                {
-                    if (_predicate(*item))
-                        return std::move(*item);
-                }
-
-                return {};
-            }
-    };
-    
-    template <typename Container, typename OutContainer>
-    class Map : public IIterator<OutContainer>
-    {
-        IIterator<Container>& _iter;
-        std::function<typename OutContainer::value_type(typename Container::value_type)> _fun;
-
-      public:
-        Map(IIterator<Container>& iter, std::function<typename OutContainer::value_type(typename Container::value_type)> fun)
-            : _iter(iter)
-            , _fun(fun)
-        {
-        }
-
-        std::optional<typename OutContainer::value_type> next() override
-        {
-            if (auto item = _iter.next())
-            {
-                return _fun(*item);
-            }
-
-            return {};
-        }
-    };
-
-    template <typename Container>
-    class Take : public IIterator<Container>
-    {
-        IIterator<Container>& _iter;
-        int _count;
-
-      public:
-        Take(IIterator<Container>& iter, int count) 
-            : _iter(iter)
-            , _count(count)
-        {
-        }
-
-        std::optional<typename Container::value_type> next() override
-        {
-            if (_count > 0)
-            if (auto item = _iter.next())
-            {
-                _count--;
-                return std::move(*item);
-            }
-
-            return {};
-        }
-    };
-
-    template <typename Container>
-    class Cloned : public IIterator<Container>
-    {
-        IIterator<Container>& _iter;
-
-      public:
-        Cloned(IIterator<Container>& iter)
-            : _iter(iter)
-        {
-        }
-
-        std::optional<typename Container::value_type> next() override
-        {
-            if (auto item = _iter.next())
-            {
-                return *item;
-            }
-
-            return {};
-        }
-    };
-} // into
-
-namespace ref
-{
-    template<typename ContainerIn, typename ContainerOut>
-    class Map;
-
-    template<typename Container>
+    template <typename Type, template <typename, typename...> class Container, typename... Args>
     class Filter;
 
-    template<typename Container>
-    class Take;
-
-    template<typename Container>
+    template <typename Type, template <typename, typename...> class Container, typename... Args>
     class Cloned;
 
-    template<typename Container, typename Container2>
+    template <typename InType, typename OutType, template <typename, typename...> class Container, typename... Args>
+    class Map;
+ 
+    /*
+    template <typename Type1, typename Type2, template <typename, typename...> class Container, typename... Args>
     class Zip;
+    */
 
-    template <typename Container>
+    template <typename Type, template <typename, typename...> class Container, typename... Args>
     class IIterator
     {
         public:
-            virtual std::optional<typename Container::value_type*> next() = 0;
+            virtual std::optional<Type*> next() = 0;
 
-            template<typename OutCont>
-            Map<OutCont, Container> map(std::function<typename OutCont::value_type(const typename Container::value_type&)> fun)
+            auto take(int count)
             {
-                return Map<OutCont, Container>(*this, fun);
+                return Take<Type, Container, Args...>(*this, count);
             }
 
-            Filter<Container> filter(std::function<bool(const typename Container::value_type&)> pred)
+            auto filter(std::function<bool(const Type&)> predicate)
             {
-                return Filter<Container>(*this, pred);
+                return Filter<Type, Container, Args...>(*this, predicate);
             }
 
-            Take<Container> take(int count)
+            auto cloned()
             {
-                return Take<Container>(*this, count);
+                return Cloned<Type, Container, Args...>(*this);
             }
 
-            virtual Container collect()
+            template <typename OutType>
+            auto map(std::function<OutType(const Type&)> function)
             {
-                Container cont;
+                return Map<Type, OutType, Container, Args...>(*this, function);
+            }
+
+            /*
+            template <typename OtherType>
+            IIterator<std::pair<Type, OtherType>, Container, Args...> zip(IIterator<OtherType, Container, Args...>& other)
+            {
+                return Zip<Type, OtherType, Container, Args...>(*this, other);
+            }
+            */
+
+            auto collect()
+            {
+                Container<Type, Args...> cont;
                 
                 while (auto item = next())
-                {
-                    std::cerr << "collect\n";
                     cont.push_back(**item);
-                }
+
+                return cont;
+            }
+
+            template <template <typename, typename...> class OutContainer, typename... OutArgs>
+            auto convert()
+            {
+                OutContainer<Type, Args...> cont;
+
+                while (auto item = next())
+                    cont.push_back(**item);
 
                 return cont;
             }
@@ -267,23 +90,23 @@ namespace ref
             }
     };
 
-    template <typename Container>
-    class Iter : public IIterator<Container>
+    template <typename Type, template <typename, typename...> class Container, typename... Args>
+    class Iter : public IIterator<Type, Container, Args...>
     {
         protected:
-            typename Container::iterator _begin;
-            typename Container::iterator _end;
+            typename Container<Type, Args...>::iterator _begin;
+            typename Container<Type, Args...>::iterator _end;
 
         public:
             Iter(Iter& other) = default;
 
-            Iter(Container& cont)
+            Iter(Container<Type, Args...>& cont)
                 : _begin(std::begin(cont))
                 , _end(std::end(cont))
             {
             }
 
-            std::optional<typename Container::value_type*> next() override
+            std::optional<Type*> next() override
             {
                 if (_begin == _end)
                 {
@@ -291,7 +114,6 @@ namespace ref
                 }
                 else
                 {
-                    std::cerr << "iter next\n";
                     auto& res = *_begin;
                     _begin++;
                     return &res;
@@ -299,77 +121,24 @@ namespace ref
             }
     };
 
-    template <typename Container>
-    class Filter : public IIterator<Container>
+    template <typename Type, template <typename, typename...> class Container, typename... Args>
+    class Take : public IIterator<Type, Container, Args...>
     {
-        IIterator<Container>& _iter;
-        std::function<bool(typename Container::value_type)> _predicate;
-
-        public:
-            Filter(IIterator<Container>& iter, std::function<bool(const typename Container::value_type&)> pred)
-                : _iter(iter)
-                , _predicate(pred)
-            {
-            }
-
-            std::optional<typename Container::value_type*> next() override
-            {
-                while(auto item = _iter.next())
-                {
-                    if (_predicate(**item))
-                        return *item;
-                }
-
-                return {};
-            }
-    };
-    
-    template <typename Container, typename OutContainer>
-    class Map : public IIterator<OutContainer>
-    {
-        IIterator<Container>& _iter;
-        typename OutContainer::value_type _result;
-        std::function<typename OutContainer::value_type(const typename Container::value_type&)> _fun;
-
-      public:
-        Map(IIterator<Container>& iter, std::function<typename OutContainer::value_type(typename Container::value_type)> fun)
-            : _iter(iter)
-            , _fun(fun)
-        {
-        }
-
-        std::optional<typename OutContainer::value_type*> next() override
-        {
-            if (auto item = _iter.next())
-            {
-                std::cerr << "map next\n";
-                _result = _fun(**item);
-                return &_result;
-            }
-
-            return {};
-        }
-    };
-
-    template <typename Container>
-    class Take : public IIterator<Container>
-    {
-        IIterator<Container>& _iter;
+        IIterator<Type, Container, Args...>& _iter;
         int _count;
 
       public:
-        Take(IIterator<Container>& iter, int count) 
+        Take(IIterator<Type, Container, Args...>& iter, int count) 
             : _iter(iter)
             , _count(count)
         {
         }
 
-        std::optional<typename Container::value_type*> next() override
+        std::optional<Type*> next() override
         {
             if (_count > 0)
             if (auto item = _iter.next())
             {
-                std::cerr << "take next\n";
                 _count--;
                 return *item;
             }
@@ -378,19 +147,42 @@ namespace ref
         }
     };
 
-    template <typename Container>
-    class Cloned : public IIterator<Container>
+    template <typename Type, template <typename, typename...> class Container, typename... Args>
+    class Filter : public IIterator<Type, Container, Args...>
     {
-        IIterator<Container>& _iter;
-        typename Container::value_type _current;
+        IIterator<Type, Container, Args...>& _iter;
+        std::function<bool(const Type&)> _predicate;
 
       public:
-        Cloned(IIterator<Container>& iter)
+        Filter(IIterator<Type, Container, Args...>& iter, std::function<bool(const Type&)>  predicate)
+            : _iter(iter)
+            , _predicate(predicate)
+        {
+        }
+
+        std::optional<Type*> next() override
+        {
+            while(auto item = _iter.next())
+                if (_predicate(**item))
+                    return *item; 
+
+            return {};
+        }
+    };
+
+    template <typename Type, template <typename, typename...> class Container, typename... Args>
+    class Cloned : public IIterator<Type, Container, Args...>
+    {
+        IIterator<Type, Container, Args...>& _iter;
+        Type _current;
+
+      public:
+        Cloned(IIterator<Type, Container, Args...>& iter)
             : _iter(iter)
         {
         }
 
-        std::optional<typename Container::value_type*> next() override
+        std::optional<Type*> next() override
         {
             if (auto item = _iter.next())
             {
@@ -402,30 +194,59 @@ namespace ref
         }
     };
 
-/*
-    template<typename Container, typename Container2>
-    class Zip : public IIterator<std::pair<Container,Container2>>
+    template <typename InType, typename OutType, template <typename, typename...> class Container, typename... Args>
+    class Map : public IIterator<OutType, Container, Args...>
     {
-        IIterator<Container>& _iter1;
-        IIterator<Container2>& _iter2;
+        IIterator<InType, Container, Args...>& _iter;
+        OutType _result;
+        std::function<OutType(const InType&)> _fun;
 
       public:
-        Zip(IIterator<Container>& iter1, IIterator<Container2>& iter2)
+        Map(IIterator<InType, Container, Args...>& iter, std::function<OutType(const InType&)> fun)
+            : _iter(iter)
+            , _fun(fun)
+        {
+        }
+
+        std::optional<OutType*> next() override
+        {
+            if (auto item = _iter.next())
+            {
+                _result = _fun(**item);
+                return &_result;
+            }
+
+            return {};
+        }
+    };
+
+    /*
+    template <typename Type, typename OtherType, template <typename, typename...> class Container, ...Args>
+    class Zip : public IIterator<std::pair<Type, OtherType>, Container, Args...>
+    {
+        IIterator<Type, Container, Args...>& _iter1;
+        IIterator<OtherType, Container, OtherArgs...>& _iter2;
+
+        std::pair<Type, OtherType> _result;
+
+      public:
+        Zip(IIterator<Type, Container, Args...>& iter1, IIterator<OtherType, Container, Args...>& iter2)
             : _iter1(iter1)
             , _iter2(iter2)
         {
         }
 
-        std::optional<std::pair<typename Container::value_type*,
-                                typename Container2::value_type*>> next() override
+        std::optional<std::pair<Type, OtherType>*> next() override
         {
             if (auto item1 = _iter1.next())
             if (auto item2 = _iter2.next())
-                return std::make_pair(*item1, *item2);
+            {
+                _result = std::make_pair(**item1, **item2);
+                return &_result;
+            }
 
             return {};
         }
     };
     */
-} // ref
 } // fun
