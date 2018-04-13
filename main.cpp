@@ -49,9 +49,10 @@ int main(int argc, char** argv)
     auto map = [](int a) { return a*a; };
 
     //auto it2 = it.map<std::vector<int>>(square).take(2).collect();
-    auto v = it1.take(5).filter([](auto& a) { return a > 2; }).map<int>([](auto& a) { return a*a; }).collect();
+    auto v = it1.take(5).filter([](auto a) { return a > 2;}).map<std::vector<float>>([](auto i) { return 1.0*i; })
+        .zip(it2).collect();
 
-    std::cerr << "elems\n";
+    std::cerr << "elems of " << typeid(v).name() << "\n";
     for (auto& a : v)
         std::cerr << a << "\n";
 
