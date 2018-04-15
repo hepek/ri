@@ -37,24 +37,34 @@ struct Test
 
         return *this;
     }
+    
+    friend std::ostream& operator<<(std::ostream& os, const Test& t);  
 };
+
+std::ostream& operator<<(std::ostream& out, const Test& t)
+{
+    out << "Test(" << t.member << ")";
+    return out;
+}
 
 int main(int argc, char** argv)
 {
-    std::list<int> a { 0, 1, 2, 42, 43, 44 };
+    std::list<int> a { (0), (1), (2), (3), (42), (43), (44) };
     std::list<std::string> b { "test", "hello", "world", "aloha" };
-    fun::Iter it1(a);
-    fun::Iter it2(b);
+    auto it1 = fun::iter(a);
+    auto strings = fun::iter(b);
 
-    auto map = [](int a) { return a*a; };
+    auto gt2 = [](auto a) { return a > 2; };
+    auto sq = [](auto a) { return a*a; };
 
-    //auto it2 = it.map<std::vector<int>>(square).take(2).collect();
-    auto v = it1.take(5).filter([](auto a) { return a > 2;}).map<std::vector<float>>([](auto i) { return 1.0*i; })
-        .zip(it2).collect();
+    auto transformed = it1.take(5).filter(gt2).map<int>(sq);
 
-    std::cerr << "elems of " << typeid(v).name() << "\n";
+    auto v = strings.zip<int>(transformed).collect<std::map<std::string,int>>();
+
+    std::cerr << "\nelems of " << typeid(v).name() << "\n";
+
     for (auto& a : v)
-        std::cerr << a << "\n";
+        std::cerr << a.first << " = " << a.second << "\n";
 
     return 0;
 }

@@ -2,55 +2,66 @@
 #include <optional>
 #include <functional>
 #include <iostream>
+#include <memory>
 
 
 namespace fun
 {
     template <typename Container>
+    class Iter;
+
+    template <typename T>
     class Take;
 
-    template <typename Container>
+    template <typename T>
     class Filter;
 
-    template <typename InContainer, typename OutContainer>
+    template <typename Tin, typename Tout>
     class Map;
  
-    template <typename FirstContainer, typename SecondContainer>
+    template <typename Tfirst, typename Tsecond>
     class Zip;
 
     template <typename Container>
+    auto iter(Container c)
+    {
+        return Iter<Container>(c);
+    }
+
+    template <typename T>
     class IIterator
     {
         public:
-            virtual std::optional<typename Container::value_type*> next() = 0;
+            virtual std::optional<T*> next() = 0;
+
+            virtual ~IIterator(){};
 
             auto take(int count)
             {
-                return Take<Container>(*this, count);
+                return Take<T>(*this, count);
             }
 
-            auto filter(std::function<bool(const typename Container::value_type&)> predicate)
+            auto filter(std::function<bool(const T&)> predicate)
             {
-                return Filter<Container>(*this, predicate);
+                return Filter<T>(*this, predicate);
             }
 
-
-            template <typename OutContainer>
-            auto map(std::function<typename OutContainer::value_type(const typename Container::value_type&)> function)
+            template <typename Tout>
+            auto map(std::function<Tout(const T&)> function)
             {
-                return Map<Container, OutContainer>(*this, function);
+                return Map<T, Tout>(*this, function);
             }
 
-            template <typename OtherContainer>
-            IIterator<std::pair<typename Container::value_type, typename OtherContainer::value_type>>
-            zip(IIterator<OtherContainer>& other)
+            template <typename Tother>
+            auto zip(IIterator<Tother>& other)
             {
-                return Zip<Container, OtherContainer>(*this, other);
+                return Zip<T, Tother>(*this, other);
             }
 
+            template <template <typename, typename...> class Container, typename... Args>
             auto collect()
             {
-                Container cont;
+                Container<T, Args...> cont;
                 
                 while (auto item = next())
                     cont.insert(std::end(cont), **item);
@@ -80,7 +91,7 @@ namespace fun
             }
     };
     template <typename Container>
-    class Iter : public IIterator<Container>
+    class Iter : public IIterator<typename Container::value_type>
     {
         protected:
             typename Container::iterator _begin;
@@ -110,20 +121,20 @@ namespace fun
             }
     };
 
-    template <typename Container>
-    class Take : public IIterator<Container>
+    template <typename T>
+    class Take : public IIterator<T>
     {
-        IIterator<Container>& _iter;
+        IIterator<T>& _iter;
         int _count;
 
       public:
-        Take(IIterator<Container>& iter, int count) 
+        Take(IIterator<T>& iter, int count) 
             : _iter(iter)
             , _count(count)
         {
         }
 
-        std::optional<typename Container::value_type*> next() override
+        std::optional<T*> next() override
         {
             if (_count > 0)
             if (auto item = _iter.next())
@@ -136,44 +147,50 @@ namespace fun
         }
     };
 
-    template <typename Container>
-    class Filter : public IIterator<Container>
+    template <typename T>
+    class Filter : public IIterator<T>
     {
-        IIterator<Container>& _iter;
-        std::function<bool(const typename Container::value_type&)> _predicate;
+        IIterator<T>& _iter;
+        std::function<bool(const T&)> _predicate;
 
       public:
-        Filter(IIterator<Container>& iter, std::function<bool(const typename Container::value_type&)>  predicate)
+        Filter(IIterator<T>& iter, std::function<bool(const T&)>  predicate)
             : _iter(iter)
             , _predicate(predicate)
         {
         }
 
-        std::optional<typename Container::value_type*> next() override
+        std::optional<T*> next() override
         {
             while(auto item = _iter.next())
+            {
+                std::cerr << "Test::next\n";
                 if (_predicate(**item))
-                    return *item; 
+                {
+                    std::cerr << "Emitting";
+                    return *item;
+                }
+            }
 
             return {};
         }
     };
 
-    template <typename InContainer, typename OutContainer>
-    class Map : public IIterator<OutContainer>
+    template <typename Tin, typename Tout>
+    class Map : public IIterator<Tout>
     {
-        IIterator<InContainer>& _iter;
-        typename OutContainer::value_type _result;
-        std::function<typename OutContainer::value_type(const typename InContainer::value_type&)> _fun;
+        IIterator<Tin>& _iter;
+        Tout _result;
+        std::function<Tout(const Tin&)> _fun;
 
       public:
-        Map(IIterator<InContainer>& iter, std::function<typename OutContainer::value_type(const typename InContainer::value_type&)> fun)
+        Map(IIterator<Tin>& iter, std::function<Tout(const Tin&)> fun)
             : _iter(iter)
             , _fun(fun)
         {
         }
 
-        std::optional<typename OutContainer::value_type*> next() override
+        std::optional<Tout*> next() override
         {
             if (auto item = _iter.next())
             {
@@ -185,24 +202,24 @@ namespace fun
         }
     };
 
-    template <typename FirstContainer, typename SecondContainer>
-    class Zip : public IIterator<std::pair<typename FirstContainer::value_type, typename SecondContainer::value_type>>
+    template <typename Tfirst, typename Tsecond>
+    class Zip : public IIterator<std::pair<Tfirst, Tsecond> >
     {
-        IIterator<FirstContainer>& _iter1;
-        IIterator<SecondContainer>& _iter2;
+        IIterator<Tfirst>& _iter1;
+        IIterator<Tsecond>& _iter2;
 
-        using Pair = std::pair<typename FirstContainer::value_type, typename SecondContainer::value_type>;
+        using Pair = std::pair<Tfirst, Tsecond>;
         Pair _result;
 
       public:
-        Zip(IIterator<FirstContainer>& iter1, IIterator<SecondContainer>& iter2)
+        Zip(IIterator<Tfirst>& iter1, IIterator<Tsecond>& iter2)
             : _iter1(iter1)
             , _iter2(iter2)
         {
         }
 
-        std::optional<Pair*> next() override
-        {
+        std::optional<std::pair<Tfirst, Tsecond>* > next() override
+        { 
             if (auto item1 = _iter1.next())
             if (auto item2 = _iter2.next())
             {
