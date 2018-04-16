@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <list>
+#include <map>
 #include "funiter.h"
 
 struct Test
@@ -36,31 +37,34 @@ struct Test
 
         return *this;
     }
+    
+    friend std::ostream& operator<<(std::ostream& os, const Test& t);  
 };
 
+std::ostream& operator<<(std::ostream& out, const Test& t)
+{
+    out << "Test(" << t.member << ")";
+    return out;
+}
 
 int main(int argc, char** argv)
 {
-    auto square = std::function([](int a) -> int { return a*a; });
-    auto gt0 = std::function([](const int& a) -> bool { return a > 0; });
+    std::list<int> a { (0), (1), (2), (3), (42), (43), (44) };
+    std::list<std::string> b { "test", "hello", "world", "aloha" };
+    auto it1 = fun::iter(a);
+    auto strings = fun::iter(b);
 
-    //std::vector<int> a{ 0, 1, 2, 3 };
-    std::list<Test> a { Test(2), Test(3), Test(4) };
-    std::list<int> b { 42, 43, 44 };
+    auto gt2 = [](auto a) { return a > 2; };
+    auto sq = [](auto a) { return a*a; };
 
-    std::cerr << "Mkiter" << std::endl;
+    auto transformed = it1.take(5).filter(gt2).map<int>(sq);
 
-    fun::ref::Iter it(a);
+    auto v = strings.zip<int>(transformed).collect<std::map<std::string,int>>();
 
-    //auto it2 = it.map<std::vector<int>>(square).take(2).collect();
-    auto vec2 = it.take(3).map<std::list<Test>>([](const Test& a)
-            { return Test(a.member*a.member); }).collect();
-    std::cerr << "\n\n";
+    std::cerr << "\nelems of " << typeid(v).name() << "\n";
 
-    for (auto& x : vec2)
-      std::cerr << x.member << " ";
-
-    std::cerr << std::endl;
+    for (auto& a : v)
+        std::cerr << a.first << " = " << a.second << "\n";
 
     return 0;
 }

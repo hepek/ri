@@ -1,4 +1,4 @@
-CXXFLAGS=-std=c++17 -O2
+CXXFLAGS=-std=c++17 -g -Wall
 
 main: main.cpp funiter.h
 
