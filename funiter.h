@@ -4,7 +4,6 @@
 #include <iostream>
 #include <memory>
 
-
 namespace fun
 {
     template <typename Container>
@@ -23,39 +22,40 @@ namespace fun
     class Zip;
 
     template <typename Container>
-    auto iter(Container c)
+    auto iter(Container& c)
     {
-        return Iter<Container>(c);
+        return std::make_shared<Iter<Container>>(c);
     }
 
     template <typename T>
-    class IIterator
+    class IIterator : public std::enable_shared_from_this<IIterator<T>>
     {
         public:
-            virtual std::optional<T*> next() = 0;
-
+            virtual T* next() = 0;
             virtual ~IIterator(){};
+
+            using Ptr = std::shared_ptr<IIterator>;
 
             auto take(int count)
             {
-                return Take<T>(*this, count);
+                return std::make_shared<Take<T>>(this->shared_from_this(), count);
             }
 
             auto filter(std::function<bool(const T&)> predicate)
             {
-                return Filter<T>(*this, predicate);
+                return std::make_shared<Filter<T>>(this->shared_from_this(), predicate);
             }
 
             template <typename Tout>
             auto map(std::function<Tout(const T&)> function)
             {
-                return Map<T, Tout>(*this, function);
+                return std::make_shared<Map<T, Tout>>(this->shared_from_this(), function);
             }
 
             template <typename Tother>
-            auto zip(IIterator<Tother>& other)
+            auto zip(typename IIterator<Tother>::Ptr other)
             {
-                return Zip<T, Tother>(*this, other);
+                return std::make_shared<Zip<T, Tother>>(this->shared_from_this(), other);
             }
 
             template <template <typename, typename...> class Container, typename... Args>
@@ -64,7 +64,7 @@ namespace fun
                 Container<T, Args...> cont;
                 
                 while (auto item = next())
-                    cont.insert(std::end(cont), **item);
+                    cont.insert(std::end(cont), *item);
 
                 return cont;
             }
@@ -75,7 +75,7 @@ namespace fun
                 OutContainer cont;
 
                 while (auto item = next())
-                    cont.insert(std::end(cont), **item);
+                    cont.insert(std::end(cont), *item);
 
                 return cont;
             }
@@ -106,11 +106,11 @@ namespace fun
             {
             }
 
-            std::optional<typename Container::value_type*> next() override
+            typename Container::value_type* next() override
             {
                 if (_begin == _end)
                 {
-                    return {};
+                    return nullptr;
                 }
                 else
                 {
@@ -124,110 +124,110 @@ namespace fun
     template <typename T>
     class Take : public IIterator<T>
     {
-        IIterator<T>& _iter;
+        typename IIterator<T>::Ptr _iter;
         int _count;
 
       public:
-        Take(IIterator<T>& iter, int count) 
+        Take(typename IIterator<T>::Ptr iter, int count) 
             : _iter(iter)
             , _count(count)
         {
         }
 
-        std::optional<T*> next() override
+        T* next() override
         {
             if (_count > 0)
-            if (auto item = _iter.next())
+            if (auto item = _iter->next())
             {
                 _count--;
-                return *item;
+                return item;
             }
 
-            return {};
+            return nullptr;
         }
     };
 
     template <typename T>
     class Filter : public IIterator<T>
     {
-        IIterator<T>& _iter;
+        typename IIterator<T>::Ptr _iter;
         std::function<bool(const T&)> _predicate;
 
       public:
-        Filter(IIterator<T>& iter, std::function<bool(const T&)>  predicate)
+        Filter(typename IIterator<T>::Ptr iter, std::function<bool(const T&)>  predicate)
             : _iter(iter)
             , _predicate(predicate)
         {
         }
 
-        std::optional<T*> next() override
+        T* next() override
         {
-            while(auto item = _iter.next())
+            while(auto item = _iter->next())
             {
                 std::cerr << "Test::next\n";
-                if (_predicate(**item))
+                if (_predicate(*item))
                 {
                     std::cerr << "Emitting";
-                    return *item;
+                    return item;
                 }
             }
 
-            return {};
+            return nullptr;
         }
     };
 
     template <typename Tin, typename Tout>
     class Map : public IIterator<Tout>
     {
-        IIterator<Tin>& _iter;
+        typename IIterator<Tin>::Ptr _iter;
         Tout _result;
         std::function<Tout(const Tin&)> _fun;
 
       public:
-        Map(IIterator<Tin>& iter, std::function<Tout(const Tin&)> fun)
+        Map(typename IIterator<Tin>::Ptr iter, std::function<Tout(const Tin&)> fun)
             : _iter(iter)
             , _fun(fun)
         {
         }
 
-        std::optional<Tout*> next() override
+        Tout* next() override
         {
-            if (auto item = _iter.next())
+            if (auto item = _iter->next())
             {
-                _result = _fun(**item);
+                _result = _fun(*item);
                 return &_result;
             }
 
-            return {};
+            return nullptr;
         }
     };
 
     template <typename Tfirst, typename Tsecond>
     class Zip : public IIterator<std::pair<Tfirst, Tsecond> >
     {
-        IIterator<Tfirst>& _iter1;
-        IIterator<Tsecond>& _iter2;
+        typename IIterator<Tfirst>::Ptr _iter1;
+        typename IIterator<Tsecond>::Ptr _iter2;
 
         using Pair = std::pair<Tfirst, Tsecond>;
         Pair _result;
 
       public:
-        Zip(IIterator<Tfirst>& iter1, IIterator<Tsecond>& iter2)
+        Zip(typename IIterator<Tfirst>::Ptr iter1, typename IIterator<Tsecond>::Ptr iter2)
             : _iter1(iter1)
             , _iter2(iter2)
         {
         }
 
-        std::optional<std::pair<Tfirst, Tsecond>* > next() override
+        std::pair<Tfirst, Tsecond>* next() override
         { 
-            if (auto item1 = _iter1.next())
-            if (auto item2 = _iter2.next())
+            if (auto item1 = _iter1->next())
+            if (auto item2 = _iter2->next())
             {
-                _result = std::make_pair(**item1, **item2);
+                _result = std::make_pair(*item1, *item2);
                 return &_result;
             }
 
-            return {};
+            return nullptr;
         }
     };
 } // fun
