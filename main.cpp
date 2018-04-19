@@ -50,10 +50,8 @@ std::ostream& operator<<(std::ostream& out, const Test& t)
 
 int main(int argc, char** argv)
 {
-    std::vector<int> a { (0), (1), (2), (3), (42), (43), (44) };
     std::vector<std::string> b { "test", "hello", "world", "aloha" };
-    //std::vector<int> b { 4, 4, 4, 4, 4, 4, 4};
-    auto it1 = fun::iter(a);
+    auto it1 = fun::gen<int>(1,5,50);
     auto it2 = fun::iter(b);
 
     auto gt2 = [](auto& a) { return a > 2; };
