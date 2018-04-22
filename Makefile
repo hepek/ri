@@ -1,9 +1,15 @@
 CXXFLAGS=-std=c++17 -g -Wall
 
-main: main.cpp funiter.h
+all: main test
+	./test
 
-funiter.h:
+test: ri.h
+
+main: main.cpp ri.h
+
+ri.h:
 	touch main.cpp
+
 
 run: main
 	./main

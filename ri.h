@@ -4,7 +4,7 @@
 #include <iostream>
 #include <memory>
 
-namespace fun
+namespace ri
 {
     template <typename Container>
     class Iter;
@@ -78,14 +78,23 @@ namespace fun
             {
                 T* last = nullptr;
 
-                while (last = next());
+                while (auto item = next())
+                    last = item;
 
                 return last;
             }
 
             auto nth(int n)
             {
-                return take(n).last();
+                int c = 0;
+
+                while (c < n)
+                {
+                    next();
+                    c++;
+                }
+
+                return next();
             }
 
             auto take(int count)
@@ -141,7 +150,8 @@ namespace fun
 
             auto enumerate()
             {
-                return zip(gen<size_t>(0), this->shared_from_this());
+                auto nums = gen<size_t>(0);
+                return std::make_shared<Zip<size_t, T>>(nums, this->shared_from_this());
             }
 
             auto take_while(std::function<bool(const T&)> pred)
@@ -196,7 +206,7 @@ namespace fun
                 T sum = T(0);
 
                 while(auto item = next())
-                    sum = sum + item;
+                    sum = sum + *item;
 
                 return sum;
             }
@@ -206,7 +216,7 @@ namespace fun
                 T prod = T(1);
 
                 while(auto item = next())
-                    prod = sum * item;
+                    prod = prod * *item;
 
                 return prod;
             }
@@ -322,9 +332,14 @@ namespace fun
             while (auto item = _iter->next())
             {
                 if (!_done && _pred(*item))
+                {
                     return item;
+                }
                 else
-                    _done = true;
+                {
+                    _done = false;
+                    return nullptr;
+                }
             }
 
             return nullptr;
@@ -420,14 +435,8 @@ namespace fun
         T* next() override
         {
             while(auto item = _iter->next())
-            {
-                std::cerr << "Test::next\n";
                 if (_predicate(*item))
-                {
-                    std::cerr << "Emitting";
                     return item;
-                }
-            }
 
             return nullptr;
         }
@@ -480,7 +489,7 @@ namespace fun
                 if (auto res = _fun(*item))
                 {
                     _result = *res;
-                    return _result;
+                    return &_result;
                 }
             }
 

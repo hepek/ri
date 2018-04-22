@@ -3,7 +3,7 @@
 #include <map>
 #include <string>
 #include <vector>
-#include "funiter.h"
+#include "ri.h"
 
 struct Test
 {
@@ -51,8 +51,8 @@ std::ostream& operator<<(std::ostream& out, const Test& t)
 int main(int argc, char** argv)
 {
     std::vector<std::string> b { "test", "hello", "world", "aloha" };
-    auto it1 = fun::gen<int>(1,5,50);
-    auto it2 = fun::iter(b);
+    auto it1 = ri::gen<int>(1,5,50);
+    auto it2 = ri::iter(b);
 
     auto gt2 = [](auto& a) { return a > 2; };
     auto sq = [](auto a) { return a*a; };
