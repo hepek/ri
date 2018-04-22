@@ -1,7 +1,8 @@
 #define CATCH_CONFIG_MAIN
-#include "catch.hpp"
-#include <vector>
+#include <map>
 #include <optional>
+#include <vector>
+#include "catch.hpp"
 #include "ri.h"
 
 
@@ -188,4 +189,127 @@ TEST_CASE("skip_while")
 
 TEST_CASE("take_while")
 {
+    std::vector<int> a = {-1, -2, 0, 1, 2, -3};
+    auto iter = ri::iter(a)->take_while([](auto x) { return x < 0; });
+
+    REQUIRE(*iter->next() == -1);
+    REQUIRE(*iter->next() == -2);
+    REQUIRE(!iter->next());
+}
+
+TEST_CASE("skip")
+{
+    std::vector<char> a = {'a', 'b', 'c'};
+
+    auto iter = ri::iter(a)->skip(2);
+
+    REQUIRE(*iter->next() == 'c');
+    REQUIRE(!iter->next());
+}
+
+TEST_CASE("take")
+{
+    std::vector<char> a = {'a', 'b', 'c'};
+
+    auto iter = ri::iter(a)->take(2);
+
+    REQUIRE(*iter->next() == 'a');
+    REQUIRE(*iter->next() == 'b');
+    REQUIRE(!iter->next());
+}
+
+// TODO: scan
+TEST_CASE("scan")
+{
+}
+
+// TODO: flat_map
+TEST_CASE("flat_map")
+{
+}
+
+TEST_CASE("collect")
+{
+    std::vector<std::string> b { "test", "hello", "world", "aloha" };
+    auto numbers = ri::gen<int>(1,5,50);
+    auto strings = ri::iter(b);
+
+    auto sq = [](auto a) { return a*a; };
+
+    auto transformed = numbers->map<int>(sq);
+
+    auto v = strings->zip<int>(transformed)->collect<std::map<std::string,int>>();
+
+    REQUIRE(v.find("hello")->second == 6*6);
+
+}
+
+
+TEST_CASE("partition")
+{
+    std::vector<int> a = {-1, -2, 0, 1, 2, -3};
+    auto iter = ri::iter(a);
+
+    std::vector<int> neg, pos;
+
+    std::tie(neg, pos) = iter->partition<std::vector>([](auto a) { return a < 0; });
+
+    REQUIRE(neg.size() == 3);
+    REQUIRE(pos.size() == 3);
+
+    REQUIRE(neg[0] == -1);
+    REQUIRE(pos[2] == 2);
+}
+
+// TODO fold
+TEST_CASE("fold")
+{
+}
+
+
+TEST_CASE("all")
+{
+    std::vector<int> a = {0, 1, 2};
+    auto iter = ri::iter(a);
+
+    REQUIRE(iter->all([](auto x) { return x >= 0; }));
+}
+
+TEST_CASE("any")
+{
+    std::vector<int> a = {3, 0, 1, 2};
+    auto iter = ri::iter(a);
+
+    REQUIRE(iter->any([](auto x) { return x == 0; }));
+}
+
+TEST_CASE("find")
+{
+    std::vector<int> a = {3, 0, 1, 2};
+    auto iter = ri::iter(a);
+
+    REQUIRE(*iter->find([](auto x) { return x == 0; }) == 0);
+    REQUIRE(!iter->find([](auto x) { return x == 1389; }));
+}
+
+TEST_CASE("position")
+{
+    std::vector<int> a = {3, 0, 1, 2};
+    auto iter = ri::iter(a);
+
+    REQUIRE(*iter->position([](auto x) { return x == 0; }) == 1);
+    REQUIRE(!iter->position([](auto x) { return x == 1389; }));
+}
+
+TEST_CASE("min and max")
+{
+    std::vector<int> a = {3, 0, 1, 2};
+
+    REQUIRE(*ri::iter(a)->max() == 3);
+    REQUIRE(*ri::iter(a)->min() == 0);
+
+    std::vector<int> b;
+
+    REQUIRE(!ri::iter(b)->max());
+    REQUIRE(!ri::iter(b)->min());
 }

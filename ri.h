@@ -136,7 +136,6 @@ namespace ri
             //TODO: flat_map
             //TODO: fuse
             //TODO: inspect
-            //TODO: partition
             //TODO: try_fold
             //TODO: fold
             //TODO: any, all
@@ -189,6 +188,120 @@ namespace ri
                     cont.insert(std::end(cont), *item);
 
                 return cont;
+            }
+
+            template <template <typename, typename...> class Container, typename... Args>
+            auto partition(std::function<bool (const T&)> pred)
+            {
+                Container<T, Args...> contTrue;
+                Container<T, Args...> contFalse;
+                
+                while (auto item = next())
+                {
+                    if (pred(*item))
+                        contTrue.insert(std::end(contTrue), *item);
+                    else
+                        contFalse.insert(std::end(contFalse), *item);
+                }
+
+                return std::make_pair(contTrue, contFalse);
+            }
+
+            template <typename OutContainer>
+            auto partition(std::function<bool (const T&)> pred)
+            {
+                OutContainer contTrue;
+                OutContainer contFalse;
+                
+                while (auto item = next())
+                {
+                    if (pred(*item))
+                        contTrue.insert(std::end(contTrue), *item);
+                    else
+                        contFalse.insert(std::end(contFalse), *item);
+                }
+
+                return std::make_pair(contTrue, contFalse);
+            }
+
+            bool all(std::function<bool(const T&)> predicate)
+            {
+                while (auto item = next())
+                    if (!predicate(*item))
+                        return false;
+
+                return true;
+            }
+
+            bool any(std::function<bool(const T&)> predicate)
+            {
+                while (auto item = next())
+                    if (predicate(*item))
+                        return true;
+
+                return false;
+            }
+
+            T* find(std::function<bool(const T&)> predicate)
+            {
+                while (auto item = next())
+                    if (predicate(*item))
+                        return item;
+
+                return nullptr;
+            }
+
+            std::optional<size_t> position(std::function<bool(const T&)> predicate)
+            {
+                size_t count = 0;
+
+                while (auto item = next())
+                    if (predicate(*item))
+                        return count;
+                    else
+                        ++count;
+
+                return {};
+            }
+
+            std::optional<T> max()
+            {
+                return max_by([](auto& a, auto& b) { return a < b; });
+            }
+            
+            std::optional<T> max_by(std::function<bool(const T& a, const T& b)> cmp)
+            {
+                std::optional<T> max;
+
+                while (auto item = next())
+                {
+                    if (!max)
+                        max = *item;
+                    else if (!cmp(*item, *max))
+                        max = *item;
+                }
+
+                return max;
+            }
+
+            std::optional<T> min()
+            {
+                return min_by([](auto& a, auto& b) { return a < b; });
+            }
+
+            std::optional<T> min_by(std::function<bool(const T& a, const T& b)> cmp)
+            {
+                std::optional<T> min;
+
+                while (auto item = next())
+                {
+                    if (!min)
+                        min = *item;
+                    else if (cmp(*item, *min))
+                        min = *item;
+                }
+
+                return min;
             }
 
             size_t count()
@@ -352,14 +465,12 @@ namespace ri
         typename IIterator<T>::Ptr _iter;
         int _current;
         int _count;
-        bool _done;
 
       public:
         Skip(typename IIterator<T>::Ptr iter, int count) 
             : _iter(iter)
-            , _count(count)
             , _current(0)
-            , _done(false)
+            , _count(count)
         {
         }
 

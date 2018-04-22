@@ -54,7 +54,6 @@ int main(int argc, char** argv)
     auto it1 = ri::gen<int>(1,5,50);
     auto it2 = ri::iter(b);
 
-    auto gt2 = [](auto& a) { return a > 2; };
     auto sq = [](auto a) { return a*a; };
 
     auto transformed = it1->take(5)->map<int>(sq);
