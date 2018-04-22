@@ -1,20 +1,14 @@
 CXXFLAGS=-std=c++17 -g -Wall
 
-all: main test
+all: test
 	./test
 
-test: ri.h
-
-main: main.cpp ri.h
+test: ri.h 
 
 ri.h:
-	touch main.cpp
-
-
-run: main
-	./main
+	touch test.cpp
 
 clean:
-	rm main
+	rm test
 
 .PHONY: clean, run

@@ -130,19 +130,13 @@ namespace ri
                 return std::make_shared<Chain<T>>(this->shared_from_this(), other);
             }
 
-            //TODO: for_each
             //TODO: peekable
+            //TODO: fold
             //TODO: scan
             //TODO: flat_map
             //TODO: fuse
             //TODO: inspect
-            //TODO: try_fold
-            //TODO: fold
-            //TODO: any, all
-            //TODO: find
-            //TODO: position, rposition
             //TODO: rev
-            //TODO: min, max, max_by_key, max_by, min_by_key, min_by
             //TODO: unzip
             //TODO: ordering stuff
             //TODO: cycle
@@ -302,6 +296,13 @@ namespace ri
                 }
 
                 return min;
+            }
+
+            //should i pass non-const reference?
+            void for_each(std::function<void(const T&)> fun)
+            {
+                while (auto item = next())
+                    fun(*item);
             }
 
             size_t count()
@@ -670,4 +671,4 @@ namespace ri
             return nullptr;
         }
     };
-} // fun
+} // ri namespace

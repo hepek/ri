@@ -123,7 +123,15 @@ TEST_CASE("map")
     REQUIRE(!iter->next());
 }
 
-// TEST_CASE("for_each") TODO
+TEST_CASE("for_each")
+{
+    int i = 0;
+    auto iter = ri::gen(0,10);
+
+    iter->for_each([&](auto x) { i++; });
+
+    REQUIRE(i == 10);
+}
 
 
 TEST_CASE("filter")
