@@ -56,6 +56,9 @@ namespace ri
     class Map;
 
     template <typename Tin, typename Tout>
+    class Scan;
+
+    template <typename Tin, typename Tout>
     class FlatMap;
 
     template <typename T>
@@ -191,6 +194,13 @@ namespace ri
                 return std::make_shared<FlatMap<T, Tout>>(this->shared_from_this(), function);
             }
 
+            template <typename Tout>
+            auto scan(const Tout& init,
+                   std::function<Tout(const Tout&, const T&)> function)
+            {
+                return std::make_shared<Scan<T,Tout>>(this->shared_from_this(), init, function);
+            }
+
             template <typename Tother>
             auto zip(typename IIterator<Tother>::Ptr other)
             {
@@ -206,8 +216,8 @@ namespace ri
             {
                 return std::make_shared<Cycle<T>>(this->shared_from_this());
             }
+            
 
-            //TODO: peekable
             //TODO: fold
             //TODO: scan
             //TODO: rev
@@ -375,7 +385,6 @@ namespace ri
                 return min;
             }
 
-            //should i pass non-const reference?
             void for_each(std::function<void(const T&)> fun)
             {
                 while (auto item = next())
@@ -410,6 +419,64 @@ namespace ri
                     prod = prod * *item;
 
                 return prod;
+            }
+
+            template <typename Tout>
+            auto fold(const Tout& init,
+                    std::function<Tout(const T& init, const T& current)> function)
+            {
+                Tout res = init;
+
+                while (auto item = next())
+                    res = function(res, *item);
+
+                return res;
+            }
+
+            bool eq(IIterator<T>::Ptr other)
+            {
+                T* fst = nullptr;
+                T* snd = nullptr;
+
+                while (true)
+                {
+                    fst = next();
+                    snd = other->next();
+
+                    if (!fst && snd)
+                        return false;
+                    else if (fst && !snd)
+                        return false;
+                    else if (!fst && !snd)
+                        return true;
+                    else if (*fst != *snd)
+                        return false;
+                    else
+                        continue;
+                }
+            }
+            
+            bool ne(IIterator<T>::Ptr other)
+            {
+                T* fst = nullptr;
+                T* snd = nullptr;
+
+                while (true)
+                {
+                    fst = next();
+                    snd = other->next();
+
+                    if (!fst && snd)
+                        return true;
+                    else if (fst && !snd)
+                        return true;
+                    else if (!fst && !snd)
+                        return true;
+                    else if (*fst == *snd)
+                        return false;
+                    else
+                        continue;
+                }
             }
     };
 
@@ -1071,4 +1138,40 @@ namespace ri
             return std::make_shared<Fuse<T>>(*this);
         }
     };
+
+    template <typename Tin, typename Tout>
+    class Scan : public IIterator<Tout>
+    {
+        typename IIterator<Tin>::Ptr _iter;
+        Tout _result;
+        std::function<Tout(const Tout&, const Tin&)> _fun;
+
+      public:
+        Scan(const Scan& other) = default;
+        Scan(typename IIterator<Tin>::Ptr iter,
+                const Tout& init,
+                std::function<Tout(const Tout&, const Tin&)> fun)
+            : _iter(iter)
+            , _result(init)
+            , _fun(fun)
+        {
+        }
+
+        Tout* next() override
+        {
+            if (auto item = _iter->next())
+            {
+                _result = _fun(_result, *item);
+                return &_result;
+            }
+
+            return nullptr;
+        }
+
+        typename IIterator<Tout>::Ptr clone() override
+        {
+            return std::make_shared<Scan<Tin,Tout>>(*this);
+        }
+    };
+
 } // ri namespace

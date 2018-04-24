@@ -132,6 +132,20 @@ TEST_CASE("map")
     REQUIRE(!iter->next());
 }
 
+TEST_CASE("scan")
+{
+    std::vector<int> a = {1, 2, 3};
+    auto iter = ri::iter(a)->scan<float>(1.f, [](float state, int x)
+            {
+                return state*x;
+            });
+
+    REQUIRE(*iter->next() == 1.f);
+    REQUIRE(*iter->next() == 2.f);
+    REQUIRE(*iter->next() == 6.f);
+    REQUIRE(!iter->next());
+}
+
 TEST_CASE("for_each")
 {
     int i = 0;
@@ -235,11 +249,6 @@ TEST_CASE("take")
     REQUIRE(!iter->next());
 }
 
-// TODO: scan
-TEST_CASE("scan")
-{
-}
-
 TEST_CASE("generator")
 {
     auto iter = ri::gen(0,4);
@@ -296,9 +305,13 @@ TEST_CASE("partition")
     REQUIRE(pos[2] == 2);
 }
 
-// TODO fold
 TEST_CASE("fold")
 {
+    std::vector<int> a = {1, 2, 3};
+
+    auto sum = ri::iter(a)->fold<int>(0, [](auto acc, auto x) { return acc + x; });
+
+    REQUIRE(sum == 6);
 }
 
 
@@ -358,5 +371,21 @@ TEST_CASE("lines")
 
     while(auto line = it->next())
         std::cerr << *line << "\n";
+}
+*/
+
+TEST_CASE("eq")
+{
+    REQUIRE(ri::gen(1,10)->eq(ri::gen(1,10)));
+    REQUIRE(!ri::gen(1,10)->eq(ri::gen(1,8)));
+    REQUIRE(!ri::gen(1,10)->eq(ri::gen(11,20)));
+}
+
+/* WIP
+TEST_CASE("ne")
+{
+    REQUIRE(!ri::gen(1,10)->ne(ri::gen(1,10)));
+    REQUIRE(ri::gen(1,8)->ne(ri::gen(1,10)));
+    REQUIRE(ri::gen(1,10)->ne(ri::gen(11,20)));
 }
 */
