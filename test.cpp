@@ -253,16 +253,18 @@ TEST_CASE("generator")
 
 TEST_CASE("flat_map")
 {
-    std::vector<int> a { 1, 2 };
+    std::vector<int> a { 1, 2, 3 };
     auto iter = ri::iter(a);
 
-    auto m = iter->flat_map<int>([](auto x) { return ri::gen<int>(0,2); });
+    auto m = iter->flat_map<int>([](auto x) { return ri::gen<int>(0,x); });
 
-    REQUIRE(*iter->next() == 0);
-    REQUIRE(*iter->next() == 1);
-    REQUIRE(*iter->next() == 0);
-    REQUIRE(*iter->next() == 1);
-    REQUIRE(!iter->next());
+    REQUIRE(*m->next() == 0);
+    REQUIRE(*m->next() == 0);
+    REQUIRE(*m->next() == 1);
+    REQUIRE(*m->next() == 0);
+    REQUIRE(*m->next() == 1);
+    REQUIRE(*m->next() == 2);
+    REQUIRE(!m->next());
 }
 
 TEST_CASE("collect")
@@ -346,3 +348,15 @@ TEST_CASE("min and max")
     REQUIRE(!ri::iter(b)->max());
     REQUIRE(!ri::iter(b)->min());
 }
+
+/*
+TEST_CASE("lines")
+{
+    auto l = ri::lines(ri::fs::path("/etc/passwd"));
+
+    auto it = l->take(5);
+
+    while(auto line = it->next())
+        std::cerr << *line << "\n";
+}
+*/

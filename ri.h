@@ -2,15 +2,23 @@
 #include <optional>
 #include <functional>
 #include <iostream>
+#include <fstream>
+#include <string>
 #include <memory>
+#include <experimental/filesystem>
 
 namespace ri
 {
+    namespace fs = std::experimental::filesystem;
+
     /// Iterators
 
     // Creates Iterator over stl Container
     template <typename Container>
     class Iter;
+
+    // Creates Iterator over input file
+    class LinesInFile;
 
     // Creates a generator
     template <typename T>
@@ -110,6 +118,11 @@ namespace ri
     auto repeat(const T& value)
     {
         return std::make_shared<Repeat<T>>(value);
+    }
+
+    auto lines(const fs::path& path)
+    {
+        return std::make_shared<LinesInFile>(path);
     }
 
     template <typename T>
@@ -549,6 +562,42 @@ namespace ri
             }
     };
 
+    class LinesInFile : public IIterator<std::string>
+    {
+        fs::path _path;
+        std::ifstream _file;
+        std::string _currentLine;
+
+      public:
+        LinesInFile(const LinesInFile& other)
+            : _path(other._path)
+            , _file(_path)
+        {
+        }
+
+        LinesInFile(const fs::path& path)
+            : _path(path)
+            , _file(_path)
+        {
+        }
+
+        std::string* next() override
+        {
+            if (!_file.is_open())
+                return nullptr;
+
+            if (std::getline(_file, _currentLine))
+                return &_currentLine;
+            else
+                return nullptr;
+        }
+
+        typename IIterator<std::string>::Ptr clone() override
+        {
+            return std::make_shared<LinesInFile>(*this);
+        }
+    };
+
     template <typename T>
     class Take : public IIterator<T>
     {
@@ -852,7 +901,6 @@ namespace ri
         {
             if (auto item = _iterOut->next())
             {
-                std::cerr << "flatmap: " << *item;
                 return item;
             }
             else
