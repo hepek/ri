@@ -6,8 +6,28 @@
 
 namespace ri
 {
+    /// Iterators
+
+    // Creates Iterator over stl Container
     template <typename Container>
     class Iter;
+
+    // Creates a generator
+    template <typename T>
+    class Generator;
+
+    // Empty Iterator
+    template <typename T>
+    class Empty;
+
+    // Produces value once
+    template <typename T>
+    class Once;
+
+    // Repeats value forever
+    template <typename T>
+    class Repeat;
+    /// Adapters
 
     template <typename T>
     class Take;
@@ -28,6 +48,12 @@ namespace ri
     class Map;
 
     template <typename Tin, typename Tout>
+    class FlatMap;
+
+    template <typename T>
+    class Inspect;
+
+    template <typename Tin, typename Tout>
     class FilterMap;
  
     template <typename Tfirst, typename Tsecond>
@@ -35,9 +61,12 @@ namespace ri
 
     template <typename T>
     class Chain;
-    
+
     template <typename T>
-    class Generator;
+    class Cycle;
+
+    template <typename T>
+    class Fuse;
 
     template <typename Container>
     auto iter(Container& c)
@@ -66,13 +95,32 @@ namespace ri
     }
 
     template <typename T>
+    auto empty()
+    {
+        return std::make_shared<Empty<T>>();
+    }
+
+    template <typename T>
+    auto once(const T& value)
+    {
+        return std::make_shared<Once<T>>(value);
+    }
+
+    template <typename T>
+    auto repeat(const T& value)
+    {
+        return std::make_shared<Repeat<T>>(value);
+    }
+
+    template <typename T>
     class IIterator : public std::enable_shared_from_this<IIterator<T>>
     {
         public:
-            virtual T* next() = 0;
-            virtual ~IIterator(){};
-
             using Ptr = std::shared_ptr<IIterator>;
+
+            virtual T* next() = 0;
+            virtual IIterator<T>::Ptr clone() = 0;
+            virtual ~IIterator(){};
 
             auto last()
             {
@@ -113,10 +161,21 @@ namespace ri
                 return std::make_shared<Map<T, Tout>>(this->shared_from_this(), function);
             }
 
+            auto inspect(std::function<void(const T&)> function)
+            {
+                return std::make_shared<Inspect<T>>(this->shared_from_this(), function);
+            }
+
             template <typename Tout>
             auto filter_map(std::function<std::optional<Tout>(const T&)> function)
             {
                 return std::make_shared<FilterMap<T, Tout>>(this->shared_from_this(), function);
+            }
+            
+            template <typename Tout>
+            auto flat_map(std::function<typename IIterator<Tout>::Ptr(const T&)> function)
+            {
+                return std::make_shared<FlatMap<T, Tout>>(this->shared_from_this(), function);
             }
 
             template <typename Tother>
@@ -130,16 +189,16 @@ namespace ri
                 return std::make_shared<Chain<T>>(this->shared_from_this(), other);
             }
 
+            auto cycle()
+            {
+                return std::make_shared<Cycle<T>>(this->shared_from_this());
+            }
+
             //TODO: peekable
             //TODO: fold
             //TODO: scan
-            //TODO: flat_map
-            //TODO: fuse
-            //TODO: inspect
             //TODO: rev
             //TODO: unzip
-            //TODO: ordering stuff
-            //TODO: cycle
 
             auto enumerate()
             {
@@ -160,6 +219,11 @@ namespace ri
             auto skip_while(std::function<bool(const T&)> pred)
             {
                 return std::make_shared<SkipWhile<T>>(this->shared_from_this(), pred);
+            }
+
+            auto fuse()
+            {
+                return std::make_shared<Fuse<T>>(this->shared_from_this());
             }
 
             template <template <typename, typename...> class Container, typename... Args>
@@ -344,8 +408,7 @@ namespace ri
             typename Container::iterator _end;
 
         public:
-            Iter(Iter& other) = default;
-
+            Iter(const Iter& other) = default;
             Iter(Container& cont)
                 : _begin(std::begin(cont))
                 , _end(std::end(cont))
@@ -365,6 +428,11 @@ namespace ri
                     return &res;
                 }
             }
+
+            typename IIterator<typename Container::value_type>::Ptr clone() override
+            {
+                return std::make_shared<Iter<Container>>(*this);
+            }
     };
     
     template <typename T>
@@ -376,8 +444,7 @@ namespace ri
             bool _first;
 
         public:
-            Generator(Generator& other) = default;
-
+            Generator(const Generator& other) = default;
             Generator(const T& start, std::function<void(T&)> increment)
                 : _current(start)
                 , _increment(increment)
@@ -397,6 +464,88 @@ namespace ri
                     _increment(_current);
                     return &_current;
                 }
+            }            
+            
+            typename IIterator<T>::Ptr clone() override
+            {
+                return std::make_shared<Generator<T>>(*this);
+            }
+
+    };
+
+    template <typename T>
+    class Empty : public IIterator<T>
+    {
+        public:
+            Empty(const Empty& other) = default;
+            Empty()
+            {
+            }
+
+            T* next() override
+            {
+                return nullptr;
+            }
+
+            typename IIterator<T>::Ptr clone() override
+            {
+                return std::make_shared<Empty<T>>(*this);
+            }
+    };
+
+    template <typename T>
+    class Once : public IIterator<T>
+    {
+        T _value;
+        bool _emitted;
+
+        public:
+            Once(const Once& other) = default;
+            Once(const T& value)
+                : _value(value)
+                , _emitted(false)
+            {
+            }
+
+            T* next() override
+            {
+                if (!_emitted)
+                {
+                    _emitted = true;
+                    return &_value;
+                }
+                else
+                {
+                    return nullptr;
+                }
+            }
+
+            typename IIterator<T>::Ptr clone() override
+            {
+                return std::make_shared<Once<T>>(*this);
+            }
+    };
+
+    template <typename T>
+    class Repeat : public IIterator<T>
+    {
+        T _value;
+
+        public:
+            Repeat(const Repeat& other) = default;
+            Repeat(const T& value)
+                : _value(value)
+            {
+            }
+
+            T* next() override
+            {
+                return &_value;
+            }
+
+            typename IIterator<T>::Ptr clone() override
+            {
+                return std::make_shared<Repeat<T>>(*this);
             }
     };
 
@@ -407,6 +556,7 @@ namespace ri
         int _count;
 
       public:
+        Take(const Take& other) = default;
         Take(typename IIterator<T>::Ptr iter, int count) 
             : _iter(iter)
             , _count(count)
@@ -424,6 +574,11 @@ namespace ri
 
             return nullptr;
         }
+
+        typename IIterator<T>::Ptr clone() override
+        {
+            return std::make_shared<Take<T>>(*this);
+        }
     };
 
     template <typename T>
@@ -434,6 +589,7 @@ namespace ri
         bool _done;
 
       public:
+        TakeWhile(const TakeWhile& other) = default;
         TakeWhile(typename IIterator<T>::Ptr iter, std::function<bool(const T&)> pred) 
             : _iter(iter)
             , _pred(pred)
@@ -458,6 +614,11 @@ namespace ri
 
             return nullptr;
         }
+
+        typename IIterator<T>::Ptr clone() override
+        {
+            return std::make_shared<TakeWhile<T>>(*this);
+        }
     };
 
     template <typename T>
@@ -468,6 +629,7 @@ namespace ri
         int _count;
 
       public:
+        Skip(const Skip& other) = default;
         Skip(typename IIterator<T>::Ptr iter, int count) 
             : _iter(iter)
             , _current(0)
@@ -487,6 +649,11 @@ namespace ri
 
             return nullptr;
         }
+
+        typename IIterator<T>::Ptr clone() override
+        {
+            return std::make_shared<Skip<T>>(*this);
+        }
     };
 
     template <typename T>
@@ -497,6 +664,7 @@ namespace ri
         bool _done;
 
       public:
+        SkipWhile(const SkipWhile& other) = default;
         SkipWhile(typename IIterator<T>::Ptr iter, std::function<bool(const T&)> pred) 
             : _iter(iter)
             , _pred(pred)
@@ -528,8 +696,12 @@ namespace ri
 
             return nullptr;
         }
-    };
 
+        typename IIterator<T>::Ptr clone() override
+        {
+            return std::make_shared<SkipWhile<T>>(*this);
+        }
+    };
 
     template <typename T>
     class Filter : public IIterator<T>
@@ -538,6 +710,7 @@ namespace ri
         std::function<bool(const T&)> _predicate;
 
       public:
+        Filter(const Filter& other) = default;
         Filter(typename IIterator<T>::Ptr iter, std::function<bool(const T&)>  predicate)
             : _iter(iter)
             , _predicate(predicate)
@@ -552,6 +725,11 @@ namespace ri
 
             return nullptr;
         }
+
+        typename IIterator<T>::Ptr clone() override
+        {
+            return std::make_shared<Filter<T>>(*this);
+        }
     };
 
     template <typename Tin, typename Tout>
@@ -562,6 +740,7 @@ namespace ri
         std::function<Tout(const Tin&)> _fun;
 
       public:
+        Map(const Map& other) = default;
         Map(typename IIterator<Tin>::Ptr iter, std::function<Tout(const Tin&)> fun)
             : _iter(iter)
             , _fun(fun)
@@ -578,6 +757,42 @@ namespace ri
 
             return nullptr;
         }
+
+        typename IIterator<Tout>::Ptr clone() override
+        {
+            return std::make_shared<Map<Tin,Tout>>(*this);
+        }
+    };
+
+    template <typename T>
+    class Inspect : public IIterator<T>
+    {
+        typename IIterator<T>::Ptr _iter;
+        std::function<void(const T&)> _fun;
+
+      public:
+        Inspect(const Inspect& other) = default;
+        Inspect(typename IIterator<T>::Ptr iter, std::function<void(const T&)> fun)
+            : _iter(iter)
+            , _fun(fun)
+        {
+        }
+
+        T* next() override
+        {
+            if (auto item = _iter->next())
+            {
+                _fun(*item);
+                return item;
+            }
+
+            return nullptr;
+        }
+
+        typename IIterator<T>::Ptr clone() override
+        {
+            return std::make_shared<Inspect<T>>(*this);
+        }
     };
 
     template <typename Tin, typename Tout>
@@ -588,6 +803,7 @@ namespace ri
         std::function<std::optional<Tout>(const Tin&)> _fun;
 
       public:
+        FilterMap(const FilterMap& other) = default;
         FilterMap(typename IIterator<Tin>::Ptr iter, std::function<std::optional<Tout>(const Tin&)> fun)
             : _iter(iter)
             , _fun(fun)
@@ -607,7 +823,58 @@ namespace ri
 
             return nullptr;
         }
+
+        typename IIterator<Tout>::Ptr clone() override
+        {
+            return std::make_shared<FilterMap<Tin,Tout>>(*this);
+        }
     };
+
+    template <typename Tin, typename Tout>
+    class FlatMap : public IIterator<Tout>
+    {
+        typename IIterator<Tin>::Ptr _iter;
+        Tout _result;
+        std::function<typename IIterator<Tout>::Ptr (const Tin&)> _fun;
+        typename IIterator<Tout>::Ptr _iterOut;
+
+      public:
+        FlatMap(const FlatMap& other) = default;
+        FlatMap(typename IIterator<Tin>::Ptr iter,
+                std::function<typename IIterator<Tout>::Ptr(const Tin&)> fun)
+            : _iter(iter)
+            , _fun(fun)
+            , _iterOut(empty<Tout>())
+        {
+        }
+
+        Tout* next() override
+        {
+            if (auto item = _iterOut->next())
+            {
+                std::cerr << "flatmap: " << *item;
+                return item;
+            }
+            else
+            {
+                if (auto in = _iter->next())
+                {
+                    _iterOut = _fun(*in);
+                    return next();
+                }
+                else
+                {
+                    return nullptr;
+                }
+            }
+        }
+
+        typename IIterator<Tout>::Ptr clone() override
+        {
+            return std::make_shared<FlatMap<Tin,Tout>>(*this);
+        }
+    };
+
     template <typename Tfirst, typename Tsecond>
     class Zip : public IIterator<std::pair<Tfirst, Tsecond> >
     {
@@ -618,6 +885,7 @@ namespace ri
         Pair _result;
 
       public:
+        Zip(const Zip& other) = default;
         Zip(typename IIterator<Tfirst>::Ptr iter1, typename IIterator<Tsecond>::Ptr iter2)
             : _iter1(iter1)
             , _iter2(iter2)
@@ -635,6 +903,11 @@ namespace ri
 
             return nullptr;
         }
+
+        typename IIterator<std::pair<Tfirst, Tsecond>>::Ptr clone() override
+        {
+            return std::make_shared<Zip<Tfirst, Tsecond>>(*this);
+        }
     };
 
     template <typename T>
@@ -645,6 +918,7 @@ namespace ri
         bool _consumedFirst;
 
       public:
+        Chain(const Chain& other) = default;
         Chain(typename IIterator<T>::Ptr iter1, typename IIterator<T>::Ptr iter2)
             : _iter1(iter1)
             , _iter2(iter2)
@@ -669,6 +943,84 @@ namespace ri
             }
 
             return nullptr;
+        }
+
+        typename IIterator<T>::Ptr clone() override
+        {
+            return std::make_shared<Chain<T>>(*this);
+        }
+    };
+
+    template <typename T>
+    class Cycle : public IIterator<T>
+    {
+        typename IIterator<T>::Ptr _iterOrig;
+        typename IIterator<T>::Ptr _iter;
+
+      public:
+        Cycle(const Cycle& other) = default;
+        Cycle(typename IIterator<T>::Ptr iter)
+            : _iterOrig(iter)
+            , _iter(iter->clone())
+        {
+        }
+
+        T* next() override
+        { 
+            if (auto item = _iter->next())
+            {
+                return item;
+            }
+            else
+            {
+                _iter = _iterOrig->clone();
+                return next();
+            }
+        }
+
+        typename IIterator<T>::Ptr clone() override
+        {
+            return std::make_shared<Cycle<T>>(*this);
+        }
+    };
+
+    template <typename T>
+    class Fuse : public IIterator<T>
+    {
+        typename IIterator<T>::Ptr _iter;
+        bool _done;
+
+      public:
+        Fuse(const Fuse& other) = default;
+        Fuse(typename IIterator<T>::Ptr iter)
+            : _iter(iter)
+            , _done(false)
+        {
+        }
+
+        T* next() override
+        { 
+            if (!_done)
+            {
+                if (auto item = _iter->next())
+                {
+                    return item;
+                }
+                else
+                {
+                    _done = true;
+                    return nullptr;
+                }
+            }
+            else
+            {
+                return nullptr;
+            }
+        }
+
+        typename IIterator<T>::Ptr clone() override
+        {
+            return std::make_shared<Fuse<T>>(*this);
         }
     };
 } // ri namespace

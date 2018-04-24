@@ -1,11 +1,11 @@
 CXXFLAGS=--std=c++17 -g -Wall
-CXX=clang
+CXX=g++
 LDFLAGS=-lstdc++
 
 all: test
 	./test
 
-test:
+test: ri.h
 
 test.cpp: ri.h
 

@@ -30,7 +30,18 @@ TEST_CASE("basic usage")
 
 TEST_CASE("cycle")
 {
-//todo
+    std::vector<int> a{1, 2, 3};
+    auto iter = ri::iter(a)->cycle();
+
+    REQUIRE(*iter->next() == 1);
+    REQUIRE(*iter->next() == 2);
+    REQUIRE(*iter->next() == 3);
+    REQUIRE(*iter->next() == 1);
+    REQUIRE(*iter->next() == 2);
+    REQUIRE(*iter->next() == 3);
+    REQUIRE(*iter->next() == 1);
+    REQUIRE(*iter->next() == 2);
+    REQUIRE(*iter->next() == 3);
 }
 
 TEST_CASE("sum")
@@ -78,8 +89,6 @@ TEST_CASE("nth")
 
     // Calling nth() multiple times doesn't rewind the iterator:
     REQUIRE(!it->nth(1));
-
-    //Returning nullptr if there are less than n + 1 elements:
 }
 
 TEST_CASE("chain")
@@ -231,9 +240,29 @@ TEST_CASE("scan")
 {
 }
 
-// TODO: flat_map
+TEST_CASE("generator")
+{
+    auto iter = ri::gen(0,4);
+
+    REQUIRE(*iter->next() == 0);
+    REQUIRE(*iter->next() == 1);
+    REQUIRE(*iter->next() == 2);
+    REQUIRE(*iter->next() == 3);
+    REQUIRE(!iter->next());
+}
+
 TEST_CASE("flat_map")
 {
+    std::vector<int> a { 1, 2 };
+    auto iter = ri::iter(a);
+
+    auto m = iter->flat_map<int>([](auto x) { return ri::gen<int>(0,2); });
+
+    REQUIRE(*iter->next() == 0);
+    REQUIRE(*iter->next() == 1);
+    REQUIRE(*iter->next() == 0);
+    REQUIRE(*iter->next() == 1);
+    REQUIRE(!iter->next());
 }
 
 TEST_CASE("collect")
@@ -245,11 +274,9 @@ TEST_CASE("collect")
     auto sq = [](auto a) { return a*a; };
 
     auto transformed = numbers->map<int>(sq);
-
     auto v = strings->zip<int>(transformed)->collect<std::map<std::string,int>>();
 
     REQUIRE(v.find("hello")->second == 6*6);
-
 }
 
 
@@ -258,9 +285,7 @@ TEST_CASE("partition")
     std::vector<int> a = {-1, -2, 0, 1, 2, -3};
     auto iter = ri::iter(a);
 
-    std::vector<int> neg, pos;
-
-    std::tie(neg, pos) = iter->partition<std::vector>([](auto a) { return a < 0; });
+    auto[neg, pos] = iter->partition<std::vector>([](auto a) { return a < 0; });
 
     REQUIRE(neg.size() == 3);
     REQUIRE(pos.size() == 3);
