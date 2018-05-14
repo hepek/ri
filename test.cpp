@@ -2,6 +2,7 @@
 #include <map>
 #include <optional>
 #include <vector>
+#include <chrono>
 #include "catch.hpp"
 #include "ri.h"
 
@@ -389,3 +390,59 @@ TEST_CASE("ne")
     REQUIRE(ri::gen(1,10)->ne(ri::gen(11,20)));
 }
 */
+
+
+class Perf
+{    
+    std::chrono::high_resolution_clock::time_point _start;
+    std::string _name;
+
+    public:
+        Perf(const std::string& name)
+            : _start(std::chrono::high_resolution_clock::now())
+            , _name(name)
+        {
+        }
+
+        ~Perf()
+        {
+            auto now = std::chrono::high_resolution_clock::now();
+            std::cerr << _name << ": " <<  (std::chrono::duration_cast<std::chrono::microseconds>(now - _start).count()/1000.0) << " ms\n";
+        }
+};
+
+TEST_CASE("perf")
+{
+    std::vector<int> a = ri::gen<int>(1,1000000)->collect<std::vector>();
+    std::vector<int> b;
+    std::vector<int> c;
+
+    {
+        Perf test("for loop");
+        for (auto& x : a)
+            b.push_back(x*x);
+    }
+
+    {
+        Perf test("ri::it+map");
+
+        b = ri::iter(a)->map<int>([](auto x){ return x*x;})->collect<std::vector>();
+    }
+
+
+    {
+        Perf test("ri::it+map+take");
+
+        b = ri::iter(a)->map<int>([](auto x){ return x*x;})->take(1000000)->collect<std::vector>();
+    }
+
+    {
+        Perf test("ri_static::it+map");
+        auto c = ri_static_dispatch::Iter(a);
+//            .filter(
+//                std::function([](const int& a) { return a > 10; }))
+//            .collect<std::vector<int>>();
+
+    }
+
+}
