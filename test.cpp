@@ -435,14 +435,4 @@ TEST_CASE("perf")
 
         b = ri::iter(a)->map<int>([](auto x){ return x*x;})->take(1000000)->collect<std::vector>();
     }
-
-    {
-        Perf test("ri_static::it+map");
-        auto c = ri_static_dispatch::Iter(a);
-//            .filter(
-//                std::function([](const int& a) { return a > 10; }))
-//            .collect<std::vector<int>>();
-
-    }
-
 }
